@@ -394,7 +394,7 @@ export default function ProcessPanel() {
         </div>
       ) : (
         <div className="h-full w-full flex flex-col items-center">
-            <div className="relative flex h-full w-full max-w-sm rounded overflow-hidden">
+            <div className="relative flex h-full w-full max-w-lg rounded overflow-hidden">
               <Cropper
               image={process.image.src}
               crop={crop}
@@ -405,6 +405,8 @@ export default function ProcessPanel() {
               onCropComplete={onCropComplete}
               objectFit="cover"
               restrictPosition={true}
+              zoomWithScroll={true}
+              zoomSpeed={0.05}
               />
             </div>
 
