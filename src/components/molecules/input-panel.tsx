@@ -60,7 +60,7 @@ function InputPanelContent() {
 
   return (
     <div className="h-full p-4 flex flex-col">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between flex-shrink-0">
         <h3 className="text-sm font-medium text-foreground">
           Masuk ({inputs.length})
         </h3>
@@ -74,7 +74,7 @@ function InputPanelContent() {
         </Button>
       </div>
       {inputs.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-2">
+        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-2 min-h-0">
           <div className="rounded-full bg-muted/50 p-4">
             <Upload className="w-6 h-6 text-muted-foreground" />
           </div>
@@ -91,79 +91,77 @@ function InputPanelContent() {
           </div>
         </div>
       ) : (
-        <>
-          <ScrollArea className="flex-1 w-full h-full">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-4">
-              {inputs.map((image) => (
+        <ScrollArea className="flex-1 w-full h-full min-h-0">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {inputs.map((image) => (
+              <div
+                key={image.id}
+                className="flex flex-col items-center gap-2 group"
+              >
                 <div
-                  key={image.id}
-                  className="flex flex-col items-center gap-2 group"
+                  className="relative w-full aspect-[4/3] border rounded overflow-hidden bg-muted"
+                  onClick={() => handleImageClick(image)}
+                  style={{ cursor: "pointer" }}
                 >
-                  <div
-                    className="relative w-full aspect-[4/3] border rounded overflow-hidden bg-muted"
-                    onClick={() => handleImageClick(image)}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <Image
-                      src={image.src}
-                      alt={image.name}
-                      width={200}
-                      height={100}
-                      className={`w-full h-full object-cover transition-all hover:opacity-80 hover:blur-[1px] ${
-                        process.image?.id === image.id
-                          ? "opacity-80 blur-[1px]"
-                          : ""
-                      }`}
-                    />
+                  <Image
+                    src={image.src}
+                    alt={image.name}
+                    width={200}
+                    height={100}
+                    className={`w-full h-full object-cover transition-all hover:opacity-80 hover:blur-[1px] ${
+                      process.image?.id === image.id
+                        ? "opacity-80 blur-[1px]"
+                        : ""
+                    }`}
+                  />
 
-                    {/* Modern active indicator with transparent overlay */}
-                    {process.image?.id === image.id && (
-                      <>
-                        {/* Blur overlay for active image */}
-                        <div className="absolute inset-0 bg-background/20 backdrop-blur-[0.5px]" />
-
-                        {/* Check indicator */}
-                        <div className="absolute top-2 right-2 w-6 h-6 bg-background rounded-full flex items-center justify-center shadow-lg border border-primary">
-                          <Check className="w-4 h-4 text-primary stroke-[2.5]" />
-                        </div>
-                      </>
-                    )}
-
-                    {/* Overlay trash button on hover */}
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                  {/* Modern active indicator with transparent overlay */}
+                  {process.image?.id === image.id && (
+                    <>
+                      {/* Blur overlay for active image */}
                       <div className="absolute inset-0 bg-background/20 backdrop-blur-[0.5px]" />
-                      {/* Sembunyikan tombol hapus jika gambar aktif */}
-                      {process.image?.id !== image.id && (
-                        <Button
-                          size="icon"
-                          variant="destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeInput(image.id);
-                          }}
-                          className="rounded-full relative z-10"
-                          style={{ cursor: "pointer" }}
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Image info */}
-                  <div className="w-full text-center space-y-1">
-                    <Badge
-                      variant="secondary"
-                      className="text-xs px-2 py-0.5 rounded-full"
-                    >
-                      {image.name}
-                    </Badge>
+                      {/* Check indicator */}
+                      <div className="absolute top-2 right-2 w-6 h-6 bg-background rounded-full flex items-center justify-center shadow-lg border border-primary">
+                        <Check className="w-4 h-4 text-primary stroke-[2.5]" />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Overlay trash button on hover */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                    <div className="absolute inset-0 bg-background/20 backdrop-blur-[0.5px]" />
+                    {/* Sembunyikan tombol hapus jika gambar aktif */}
+                    {process.image?.id !== image.id && (
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeInput(image.id);
+                        }}
+                        className="rounded-full relative z-10"
+                        style={{ cursor: "pointer" }}
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </Button>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </>
+
+                {/* Image info */}
+                <div className="w-full text-center space-y-1">
+                  <Badge
+                    variant="secondary"
+                    className="text-xs px-2 py-0.5 rounded-full"
+                  >
+                    {image.name}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
       )}
 
       {/* Upload Dialog/Drawer */}

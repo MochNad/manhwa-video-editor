@@ -33,7 +33,7 @@ export default function OutputPanel({}: object = {}) {
 
   return (
     <div className="h-full p-4 flex flex-col">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between flex-shrink-0">
         <h3 className="text-sm font-medium text-foreground">
           Keluar ({outputs.length})
         </h3>
@@ -48,7 +48,7 @@ export default function OutputPanel({}: object = {}) {
         </Button>
       </div>
       {outputs.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-2">
+        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-2 min-h-0">
           <div className="rounded-full bg-muted/50 p-4">
             <Download className="w-6 h-6 text-muted-foreground" />
           </div>
@@ -65,7 +65,7 @@ export default function OutputPanel({}: object = {}) {
           </div>
         </div>
       ) : (
-        <ScrollArea className="flex-1 w-full h-full">
+        <ScrollArea className="flex-1 w-full h-full min-h-0">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-4">
             {outputs.map((output) => (
               <div

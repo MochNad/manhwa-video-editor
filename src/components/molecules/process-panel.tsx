@@ -42,6 +42,7 @@ export default function ProcessPanel() {
   const [croppedImageUrl, setCroppedImageUrl] = useState<string | null>(null);
   const [customIndex, setCustomIndex] = useState<number | "">("");
   const cropperRef = useRef<ReactCropperElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null); // Tambahkan ref untuk container
 
   // Reset crop when image changes & update cropper jika aspect berubah atau gambar baru
   useEffect(() => {
@@ -221,6 +222,36 @@ export default function ProcessPanel() {
       }
     }
   };
+
+  // ResizeObserver untuk membuat cropper responsif terhadap parent resize
+  // Helper type for Cropper with resize/render
+  type CropperWithResize = Cropper & {
+    resize: () => void;
+    render: () => void;
+  };
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const cropper = cropperRef.current?.cropper;
+    if (!cropper) return;
+
+    // Fungsi untuk trigger re-render pada cropper
+    const handleResize = () => {
+      (cropper as CropperWithResize).resize();
+      (cropper as CropperWithResize).render(); // kadang perlu render ulang
+    };
+
+    // Buat observer
+    const observer = new window.ResizeObserver(() => {
+      handleResize();
+    });
+    observer.observe(containerRef.current);
+
+    // Cleanup
+    return () => {
+      observer.disconnect();
+    };
+  }, [process.image?.id]);
 
   // Gabungkan return
   return (
@@ -449,7 +480,10 @@ export default function ProcessPanel() {
         </div>
       ) : (
         <div className="h-full w-full flex flex-col items-center">
-          <div className="relative flex h-full w-full rounded overflow-hidden container">
+          <div
+            className="relative flex h-full w-full rounded overflow-hidden container"
+            ref={containerRef} // Tambahkan ref di sini
+          >
             <Cropper
               src={process.image.src}
               style={{
