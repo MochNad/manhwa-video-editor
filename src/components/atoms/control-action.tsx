@@ -53,7 +53,7 @@ export function ControlAction() {
       {/* Clear Confirmation Dialog/Drawer */}
       {isDesktop ? (
         <Dialog open={showConfirmClear} onOpenChange={setShowConfirmClear}>
-          <DialogContent className="sm:max-w-[350px]">
+          <DialogContent>
             <DialogHeader>
               <DialogTitle>Hapus Semua</DialogTitle>
               <DialogDescription asChild>

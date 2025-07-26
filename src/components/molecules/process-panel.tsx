@@ -152,7 +152,7 @@ export default function ProcessPanel() {
         // Pastikan crop box tetap di tengah horizontal, tapi atas secara vertikal
         cropper.setDragMode("move");
       }
-    }, 0.5); // Delay agar cropper update aspect ratio & container
+    }, 1); // Delay agar cropper update aspect ratio & container
   };
 
   useEffect(() => {
@@ -161,34 +161,6 @@ export default function ProcessPanel() {
       handleAspectChange(aspect);
     }
   }, [process.image, aspect]);
-
-  // Handler saat cropper ready
-  const handleReady = useCallback(() => {
-    const cropper = cropperRef.current?.cropper;
-    if (cropper) {
-      const data = cropper.getData(true);
-      setProcessCrop({
-        x: data.x,
-        y: data.y,
-        width: data.width,
-        height: data.height,
-      });
-    }
-  }, [setProcessCrop]);
-
-  // Handler saat crop berubah atau dipindah
-  const handleCrop = useCallback(() => {
-    const cropper = cropperRef.current?.cropper;
-    if (cropper) {
-      const data = cropper.getData(true);
-      setProcessCrop({
-        x: data.x,
-        y: data.y,
-        width: data.width,
-        height: data.height,
-      });
-    }
-  }, [setProcessCrop]);
 
   // Handler saat crop selesai
   const handleCropEnd = useCallback(() => {
@@ -449,10 +421,7 @@ export default function ProcessPanel() {
               rotatable={false}
               highlight={false}
               toggleDragModeOnDblclick={false}
-              ready={handleReady}
-              crop={handleCrop}
               cropend={handleCropEnd}
-              cropmove={handleCrop}
               zoomOnWheel={true}
             />
             </div>
@@ -506,7 +475,7 @@ export default function ProcessPanel() {
       {/* Preview Dialog/Drawer */}
       {isDesktop ? (
         <Dialog open={showPreview} onOpenChange={setShowPreview}>
-          <DialogContent className="max-w-lg">
+          <DialogContent>
             <DialogHeader>
               <DialogTitle>Pratinjau Animasi</DialogTitle>
             </DialogHeader>
