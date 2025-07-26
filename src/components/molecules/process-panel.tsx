@@ -40,6 +40,7 @@ export default function ProcessPanel() {
   const [fromPosition, setFromPosition] = useState("");
   const [toPosition, setToPosition] = useState("");
   const [croppedImageUrl, setCroppedImageUrl] = useState<string | null>(null);
+  const [customIndex, setCustomIndex] = useState<number | "">("");
   const cropperRef = useRef<ReactCropperElement>(null);
 
   // Reset crop when image changes & update cropper jika aspect berubah atau gambar baru
@@ -98,6 +99,40 @@ export default function ProcessPanel() {
     }
   }, [process.cropCoordinates]);
 
+  // Fungsi untuk menentukan index output berikutnya
+  const getNextIndex = () => {
+    if (customIndex !== "" && !isNaN(Number(customIndex))) {
+      return Number(customIndex);
+    }
+    // Cari index terbesar di outputs, lalu +1
+    const maxIndex = outputs.reduce((max, o) => {
+      const match = o.outputName?.match(/^\[(\d+)\]/);
+      if (match) {
+        const idx = parseInt(match[1], 10);
+        return idx > max ? idx : max;
+      }
+      return max;
+    }, 0);
+    return maxIndex + 1;
+  };
+
+  // Update index custom jika outputName berubah manual
+  useEffect(() => {
+    if (customIndex === "" && outputs.length) {
+      setCustomIndex(getNextIndex());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outputs.length]);
+
+  // Reset customIndex saat gambar baru
+  useEffect(() => {
+    setCustomIndex("");
+  }, [process.image?.id]);
+
+  // Gunakan index dari customIndex atau auto
+  const displayIndex = getNextIndex();
+  const displayName = `[${displayIndex}]${outputName}`;
+
   const handleSave = async () => {
     if (process.image && process.cropCoordinates && outputName !== "[ - ]") {
       // Create the cropped image
@@ -110,7 +145,7 @@ export default function ProcessPanel() {
       const blob = await response.blob();
 
       // Use the displayName format that includes the index
-      const finalOutputName = `[${outputs.length + 1}]${outputName}`;
+      const finalOutputName = `[${displayIndex}]${outputName}`;
 
       addOutput({
         id: Date.now().toString(),
@@ -124,10 +159,9 @@ export default function ProcessPanel() {
       setOutputName("[ - ]");
       setFromPosition("");
       setToPosition("");
+      setCustomIndex(""); // reset index ke auto
     }
   };
-
-  const displayName = `[${outputs.length + 1}]${outputName}`;
 
   const handleFromPositionChange = (value: string) => {
     setFromPosition(value);
@@ -139,7 +173,6 @@ export default function ProcessPanel() {
     setToPosition(value);
   };
 
-  // Fungsi untuk mengganti rasio dan menyesuaikan cropper & zoom
   const handleAspectChange = (newAspect: number) => {
     setAspect(newAspect);
     setTimeout(() => {
@@ -175,6 +208,19 @@ export default function ProcessPanel() {
       });
     }
   }, [setProcessCrop]);
+
+  // Handler for custom index input change
+  const handleIndexInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === "") {
+      setCustomIndex("");
+    } else {
+      const num = Number(value);
+      if (!isNaN(num) && num > 0) {
+        setCustomIndex(num);
+      }
+    }
+  };
 
   // Gabungkan return
   return (
@@ -403,12 +449,12 @@ export default function ProcessPanel() {
         </div>
       ) : (
         <div className="h-full w-full flex flex-col items-center">
-            <div className="relative flex h-full w-full rounded overflow-hidden container">
+          <div className="relative flex h-full w-full rounded overflow-hidden container">
             <Cropper
               src={process.image.src}
               style={{
-              height: "100%",
-              width: "100%",
+                height: "100%",
+                width: "100%",
               }}
               aspectRatio={aspect}
               viewMode={1}
@@ -424,7 +470,7 @@ export default function ProcessPanel() {
               cropend={handleCropEnd}
               zoomOnWheel={true}
             />
-            </div>
+          </div>
 
           <div className="p-3 flex items-center justify-between w-full">
             <div className="flex items-center gap-2">
@@ -502,6 +548,15 @@ export default function ProcessPanel() {
               )}
             </div>
             <div className="flex w-full items-center justify-center gap-4 px-4 pb-4">
+              <input
+                type="number"
+                min={1}
+                max={999}
+                className="w-16 min-w-0 max-w-[80px] px-2 py-1 border rounded text-center text-sm bg-background"
+                value={customIndex}
+                onChange={handleIndexInputChange}
+                placeholder={getNextIndex().toString()}
+              />
               <Select
                 value={fromPosition}
                 onValueChange={handleFromPositionChange}
@@ -602,6 +657,15 @@ export default function ProcessPanel() {
               )}
             </div>
             <div className="flex w-full items-center justify-center gap-4 px-4">
+              <input
+                type="number"
+                min={1}
+                max={999}
+                className="w-16 min-w-0 max-w-[80px] px-2 py-1 border rounded text-center text-sm bg-background"
+                value={customIndex}
+                onChange={handleIndexInputChange}
+                placeholder={getNextIndex().toString()}
+              />
               <Select
                 value={fromPosition}
                 onValueChange={handleFromPositionChange}

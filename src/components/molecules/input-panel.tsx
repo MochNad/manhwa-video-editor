@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/drawer";
 import { useCrop } from "@/hooks/useCrop";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { Upload, Check } from "lucide-react";
+import { Upload, Check, Trash2 } from "lucide-react"; // tambahkan Trash2
 import Image from "next/image";
 import { useState } from "react";
 import { DndProvider } from "react-dnd";
@@ -23,7 +23,7 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { DropZone } from "@/components/atoms/drop-zone";
 
 function InputPanelContent() {
-  const { inputs, setProcessImage, process, addInput } = useCrop();
+  const { inputs, setProcessImage, process, addInput, removeInput } = useCrop(); // tambahkan removeInput
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const [showUpload, setShowUpload] = useState(false);
 
@@ -33,7 +33,12 @@ function InputPanelContent() {
     name: string;
     file: File;
   }) => {
-    setProcessImage(image);
+    // Toggle aktif/nonaktif saat gambar diklik
+    if (process.image?.id === image.id) {
+      setProcessImage(null);
+    } else {
+      setProcessImage(image);
+    }
   };
 
   const handleUploadClick = () => {
@@ -94,18 +99,21 @@ function InputPanelContent() {
                   key={image.id}
                   className="flex flex-col items-center gap-2 group"
                 >
-                  <div className="relative w-full aspect-[4/3] border rounded overflow-hidden bg-muted">
+                  <div
+                    className="relative w-full aspect-[4/3] border rounded overflow-hidden bg-muted"
+                    onClick={() => handleImageClick(image)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <Image
                       src={image.src}
                       alt={image.name}
                       width={200}
                       height={100}
-                      className={`w-full h-full object-cover cursor-pointer transition-all hover:opacity-80 hover:blur-[1px] ${
+                      className={`w-full h-full object-cover transition-all hover:opacity-80 hover:blur-[1px] ${
                         process.image?.id === image.id
                           ? "opacity-80 blur-[1px]"
                           : ""
                       }`}
-                      onClick={() => handleImageClick(image)}
                     />
 
                     {/* Modern active indicator with transparent overlay */}
@@ -120,6 +128,26 @@ function InputPanelContent() {
                         </div>
                       </>
                     )}
+
+                    {/* Overlay trash button on hover */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                      <div className="absolute inset-0 bg-background/20 backdrop-blur-[0.5px]" />
+                      {/* Sembunyikan tombol hapus jika gambar aktif */}
+                      {process.image?.id !== image.id && (
+                        <Button
+                          size="icon"
+                          variant="destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeInput(image.id);
+                          }}
+                          className="rounded-full relative z-10"
+                          style={{ cursor: "pointer" }}
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Image info */}

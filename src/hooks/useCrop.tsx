@@ -57,7 +57,17 @@ export function useCrop() {
       update({ inputs: [...state.inputs, imageData] }),
     removeInput: (id: string) =>
       update({ inputs: state.inputs.filter((item) => item.id !== id) }),
-    setProcessImage: (image: ImageData) => {
+    setProcessImage: (image: ImageData | null) => {
+      if (!image) {
+        update({
+          process: {
+            image: null,
+            cropCoordinates: null,
+            currentIndex: null,
+          },
+        });
+        return;
+      }
       const currentIndex =
         state.inputs.findIndex((item) => item.id === image.id) + 1;
       update({

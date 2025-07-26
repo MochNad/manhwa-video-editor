@@ -97,6 +97,7 @@ export default function OutputPanel({}: object = {}) {
                       variant="secondary"
                       onClick={() => downloadOutput(output)}
                       className="rounded-full relative z-10"
+                      style={{ cursor: "pointer" }}
                     >
                       <Download className="w-5 h-5" />
                     </Button>
@@ -105,6 +106,7 @@ export default function OutputPanel({}: object = {}) {
                       variant="destructive"
                       onClick={() => removeOutput(output.id)}
                       className="rounded-full relative z-10"
+                      style={{ cursor: "pointer" }}
                     >
                       <Trash2 className="w-5 h-5" />
                     </Button>
