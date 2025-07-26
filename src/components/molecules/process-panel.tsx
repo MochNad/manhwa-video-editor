@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useEffect } from "react";
-import Cropper from "react-easy-crop";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import Cropper, { ReactCropperElement } from "react-cropper";
+import "cropperjs/dist/cropper.css";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,77 +21,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Save, Wand2, Crop, RectangleHorizontal, RectangleVertical } from "lucide-react";
+import {
+  Save,
+  Wand2,
+  Crop,
+  RectangleHorizontal,
+  RectangleVertical,
+} from "lucide-react";
 import { useCrop } from "@/hooks/useCrop";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export default function ProcessPanel() {
-  const { process, setProcessCrop, addOutput, outputs } = useCrop();
+  const { process, addOutput, outputs, setProcessCrop } = useCrop();
   const isDesktop = useMediaQuery("(min-width: 768px)");
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
   const [aspect, setAspect] = useState(5 / 4);
   const [outputName, setOutputName] = useState("[ - ]");
   const [showPreview, setShowPreview] = useState(false);
   const [fromPosition, setFromPosition] = useState("");
   const [toPosition, setToPosition] = useState("");
   const [croppedImageUrl, setCroppedImageUrl] = useState<string | null>(null);
+  const cropperRef = useRef<ReactCropperElement>(null);
 
-  // Reset crop when image changes
+  // Reset crop when image changes & update cropper jika aspect berubah atau gambar baru
   useEffect(() => {
-    setCrop({ x: 0, y: 0 });
-    setZoom(1);
     setOutputName("[ - ]");
     setCroppedImageUrl(null);
-  }, [process.image?.id]);
+    handleAspectChange(aspect);
+  }, [process.image?.id, aspect]);
 
-  const onCropChange = useCallback((crop: { x: number; y: number }) => {
-    setCrop(crop);
-  }, []);
-
-  const onZoomChange = useCallback((zoom: number) => {
-    setZoom(zoom);
-  }, []);
-
-  const onCropComplete = useCallback(
-    (
-      croppedArea: { x: number; y: number; width: number; height: number },
-      croppedAreaPixels: {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-      }
-    ) => {
-      setProcessCrop(croppedAreaPixels);
-    },
-    [setProcessCrop]
-  );
-
-  // Create cropped image when crop coordinates change
   const createCroppedImage = useCallback(async () => {
-    if (!process.image || !process.cropCoordinates) return;
+    if (!process.image) return;
 
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const img = new window.Image();
+    const cropper = cropperRef.current?.cropper;
+    if (!cropper) return;
 
-    return new Promise<string>((resolve) => {
-      img.onload = () => {
-        const { x, y, width, height } = process.cropCoordinates!;
-        canvas.width = width;
-        canvas.height = height;
+    // Get cropped canvas
+    const canvas = cropper.getCroppedCanvas();
+    if (!canvas) return;
 
-        ctx?.drawImage(img, x, y, width, height, 0, 0, width, height);
-
-        const dataUrl = canvas.toDataURL("image/png", 1.0);
-        setCroppedImageUrl(dataUrl);
-        resolve(dataUrl);
-      };
-
-      img.src = process.image!.src;
-    });
-  }, [process.image, process.cropCoordinates]);
+    const dataUrl = canvas.toDataURL("image/png", 1.0);
+    setCroppedImageUrl(dataUrl);
+    return dataUrl;
+  }, [process.image]);
 
   useEffect(() => {
     if (process.cropCoordinates) {
@@ -166,6 +138,71 @@ export default function ProcessPanel() {
   const handleToPositionChange = (value: string) => {
     setToPosition(value);
   };
+
+  // Fungsi untuk mengganti rasio dan menyesuaikan cropper & zoom
+  const handleAspectChange = (newAspect: number) => {
+    setAspect(newAspect);
+    setTimeout(() => {
+      const cropper = cropperRef.current?.cropper;
+      if (cropper) {
+        cropper.setAspectRatio(newAspect);
+
+        cropper.zoomTo(1);
+
+        // Pastikan crop box tetap di tengah horizontal, tapi atas secara vertikal
+        cropper.setDragMode("move");
+      }
+    }, 0.5); // Delay agar cropper update aspect ratio & container
+  };
+
+  useEffect(() => {
+    if (process.image) {
+      // Set initial aspect ratio and crop box when component mounts
+      handleAspectChange(aspect);
+    }
+  }, [process.image, aspect]);
+
+  // Handler saat cropper ready
+  const handleReady = useCallback(() => {
+    const cropper = cropperRef.current?.cropper;
+    if (cropper) {
+      const data = cropper.getData(true);
+      setProcessCrop({
+        x: data.x,
+        y: data.y,
+        width: data.width,
+        height: data.height,
+      });
+    }
+  }, [setProcessCrop]);
+
+  // Handler saat crop berubah atau dipindah
+  const handleCrop = useCallback(() => {
+    const cropper = cropperRef.current?.cropper;
+    if (cropper) {
+      const data = cropper.getData(true);
+      setProcessCrop({
+        x: data.x,
+        y: data.y,
+        width: data.width,
+        height: data.height,
+      });
+    }
+  }, [setProcessCrop]);
+
+  // Handler saat crop selesai
+  const handleCropEnd = useCallback(() => {
+    const cropper = cropperRef.current?.cropper;
+    if (cropper) {
+      const data = cropper.getData(true);
+      setProcessCrop({
+        x: data.x,
+        y: data.y,
+        width: data.width,
+        height: data.height,
+      });
+    }
+  }, [setProcessCrop]);
 
   // Gabungkan return
   return (
@@ -394,20 +431,30 @@ export default function ProcessPanel() {
         </div>
       ) : (
         <div className="h-full w-full flex flex-col items-center">
-            <div className="relative flex h-full w-full max-w-lg rounded overflow-hidden">
-              <Cropper
-              image={process.image.src}
-              crop={crop}
-              zoom={zoom}
-              aspect={aspect}
-              onCropChange={onCropChange}
-              onZoomChange={onZoomChange}
-              onCropComplete={onCropComplete}
-              objectFit="cover"
-              restrictPosition={true}
-              zoomWithScroll={true}
-              zoomSpeed={0.05}
-              />
+            <div className="relative flex h-full w-full rounded overflow-hidden container">
+            <Cropper
+              src={process.image.src}
+              style={{
+              height: "100%",
+              width: "100%",
+              }}
+              aspectRatio={aspect}
+              viewMode={1}
+              background={false}
+              responsive={true}
+              autoCropArea={1}
+              checkOrientation={false}
+              ref={cropperRef}
+              dragMode="move"
+              rotatable={false}
+              highlight={false}
+              toggleDragModeOnDblclick={false}
+              ready={handleReady}
+              crop={handleCrop}
+              cropend={handleCropEnd}
+              cropmove={handleCrop}
+              zoomOnWheel={true}
+            />
             </div>
 
           <div className="p-3 flex items-center justify-between w-full">
@@ -415,7 +462,7 @@ export default function ProcessPanel() {
               <Button
                 size="icon"
                 variant={aspect === 5 / 4 ? "default" : "secondary"}
-                onClick={() => setAspect(5 / 4)}
+                onClick={() => handleAspectChange(5 / 4)}
                 className="rounded-full"
               >
                 <RectangleHorizontal className="w-5 h-5" />
@@ -423,7 +470,7 @@ export default function ProcessPanel() {
               <Button
                 size="icon"
                 variant={aspect === 4 / 5 ? "default" : "secondary"}
-                onClick={() => setAspect(4 / 5)}
+                onClick={() => handleAspectChange(4 / 5)}
                 className="rounded-full"
               >
                 <RectangleVertical className="w-5 h-5" />
