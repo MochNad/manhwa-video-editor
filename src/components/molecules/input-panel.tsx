@@ -93,73 +93,86 @@ function InputPanelContent() {
       ) : (
         <ScrollArea className="flex-1 w-full h-full min-h-0">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {inputs.map((image) => (
-              <div
-                key={image.id}
-                className="flex flex-col items-center gap-2 group"
-              >
+            {inputs
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((image) => (
                 <div
-                  className="relative w-full aspect-[4/3] border rounded overflow-hidden bg-muted"
-                  onClick={() => handleImageClick(image)}
-                  style={{ cursor: "pointer" }}
+                  key={image.id}
+                  className="flex flex-col items-center gap-2 group"
                 >
-                  <Image
-                    src={image.src}
-                    alt={image.name}
-                    width={200}
-                    height={100}
-                    className={`w-full h-full object-cover transition-all hover:opacity-80 hover:blur-[1px] ${
+                  <div
+                    className={`relative w-full aspect-[4/3] border-2 rounded overflow-hidden bg-muted transition-all ${
                       process.image?.id === image.id
-                        ? "opacity-80 blur-[1px]"
-                        : ""
+                        ? "border-primary ring-2 ring-primary/50 shadow-lg"
+                        : "border-border hover:border-muted-foreground"
                     }`}
-                  />
+                    onClick={() => handleImageClick(image)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <Image
+                      src={image.src}
+                      alt={image.name}
+                      width={200}
+                      height={100}
+                      className={`w-full h-full object-cover transition-all ${
+                        process.image?.id === image.id
+                          ? "opacity-70 scale-95"
+                          : "hover:opacity-80 hover:blur-[1px]"
+                      }`}
+                    />
 
-                  {/* Modern active indicator with transparent overlay */}
-                  {process.image?.id === image.id && (
-                    <>
-                      {/* Blur overlay for active image */}
-                      <div className="absolute inset-0 bg-background/20 backdrop-blur-[0.5px]" />
+                    {/* Enhanced active indicator */}
+                    {process.image?.id === image.id && (
+                      <>
+                        {/* Stronger overlay for active image */}
+                        <div className="absolute inset-0 bg-primary/20" />
 
-                      {/* Check indicator */}
-                      <div className="absolute top-2 right-2 w-6 h-6 bg-background rounded-full flex items-center justify-center shadow-lg border border-primary">
-                        <Check className="w-4 h-4 text-primary stroke-[2.5]" />
-                      </div>
-                    </>
-                  )}
+                        {/* Enhanced check indicator */}
+                        <div className="absolute top-2 right-2 w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-lg border-2 border-background">
+                          <Check className="w-5 h-5 text-primary-foreground stroke-[3]" />
+                        </div>
 
-                  {/* Overlay trash button on hover */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                    <div className="absolute inset-0 bg-background/20 backdrop-blur-[0.5px]" />
-                    {/* Sembunyikan tombol hapus jika gambar aktif */}
-                    {process.image?.id !== image.id && (
-                      <Button
-                        size="icon"
-                        variant="destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeInput(image.id);
-                        }}
-                        className="rounded-full relative z-10"
-                        style={{ cursor: "pointer" }}
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </Button>
+                        {/* Active badge */}
+                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full shadow-lg">
+                          Aktif
+                        </div>
+                      </>
                     )}
+
+                    {/* Overlay trash button on hover */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                      <div className="absolute inset-0 bg-background/20 backdrop-blur-[0.5px]" />
+                      {/* Sembunyikan tombol hapus jika gambar aktif */}
+                      {process.image?.id !== image.id && (
+                        <Button
+                          size="icon"
+                          variant="destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeInput(image.id);
+                          }}
+                          className="rounded-full relative z-10"
+                          style={{ cursor: "pointer" }}
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Image info */}
+                  <div className="w-full text-center space-y-1">
+                    <Badge
+                      variant={
+                        process.image?.id === image.id ? "default" : "secondary"
+                      }
+                      className="text-xs px-2 py-0.5 rounded-full"
+                    >
+                      {image.name}
+                    </Badge>
                   </div>
                 </div>
-
-                {/* Image info */}
-                <div className="w-full text-center space-y-1">
-                  <Badge
-                    variant="secondary"
-                    className="text-xs px-2 py-0.5 rounded-full"
-                  >
-                    {image.name}
-                  </Badge>
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         </ScrollArea>
       )}

@@ -10,6 +10,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { ControlAction } from "@/components/atoms/control-action";
 
 const MAX_TITLE_LENGTH = 10;
 
@@ -99,12 +100,12 @@ export default function CropImage() {
       {/* Main Content */}
       <div className="flex-1">
         <ResizablePanelGroup direction="vertical">
-          <ResizablePanel defaultSize={75} minSize={70} maxSize={80}>
+          <ResizablePanel defaultSize={70} minSize={50} maxSize={80}>
             <ProcessPanel />
           </ResizablePanel>
           <ResizableHandle withHandle />
 
-          <ResizablePanel defaultSize={25} minSize={20} maxSize={30}>
+          <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
             <ResizablePanelGroup direction="horizontal">
               <ResizablePanel defaultSize={50} minSize={40} maxSize={60}>
                 <InputPanel />
@@ -118,6 +119,7 @@ export default function CropImage() {
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+      <ControlAction />
     </div>
   );
 }

@@ -63,7 +63,7 @@ export function ControlAction() {
                   </div>
                   <div className="text-center">
                     <div className="text-sm text-muted-foreground">
-                      Ya?
+                      Apakah Anda yakin ingin menghapus semua?
                     </div>
                   </div>
                 </div>

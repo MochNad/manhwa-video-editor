@@ -27,6 +27,7 @@ import {
   Crop,
   RectangleHorizontal,
   RectangleVertical,
+  Ratio,
 } from "lucide-react";
 import { useCrop } from "@/hooks/useCrop";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -34,7 +35,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 export default function ProcessPanel() {
   const { process, addOutput, outputs, setProcessCrop } = useCrop();
   const isDesktop = useMediaQuery("(min-width: 768px)");
-  const [aspect, setAspect] = useState(5 / 4);
+  const [aspect, setAspect] = useState(NaN);
   const [outputName, setOutputName] = useState("[ - ]");
   const [showPreview, setShowPreview] = useState(false);
   const [fromPosition, setFromPosition] = useState("");
@@ -74,17 +75,23 @@ export default function ProcessPanel() {
 
   // Update output name when positions change
   useEffect(() => {
-    if (fromPosition === "I" || fromPosition === "O") {
-      // For zoom animations, only use fromPosition
-      setOutputName(`[${fromPosition}]`);
-    } else if (fromPosition && toPosition) {
-      setOutputName(`[${fromPosition}-${toPosition}]`);
-    } else if (fromPosition) {
-      setOutputName(`[${fromPosition}-]`);
+    // Only update animation name if aspect ratio is set (not free ratio)
+    if (!isNaN(aspect)) {
+      if (fromPosition === "I" || fromPosition === "O") {
+        // For zoom animations, only use fromPosition
+        setOutputName(`[${fromPosition}]`);
+      } else if (fromPosition && toPosition) {
+        setOutputName(`[${fromPosition}-${toPosition}]`);
+      } else if (fromPosition) {
+        setOutputName(`[${fromPosition}-]`);
+      } else {
+        setOutputName("[ - ]");
+      }
     } else {
+      // For free ratio, just use empty brackets
       setOutputName("[ - ]");
     }
-  }, [fromPosition, toPosition]);
+  }, [fromPosition, toPosition, aspect]);
 
   const getAnimationClass = useCallback(() => {
     if (fromPosition === "I") return "pan-I";
@@ -125,17 +132,24 @@ export default function ProcessPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outputs.length]);
 
-  // Reset customIndex saat gambar baru
+  // Reset customIndex saat gambar baru atau outputs berubah (untuk trigger render ulang)
   useEffect(() => {
     setCustomIndex("");
-  }, [process.image?.id]);
+  }, [process.image?.id, outputs.length]);
 
   // Gunakan index dari customIndex atau auto
   const displayIndex = getNextIndex();
-  const displayName = `[${displayIndex}]${outputName}`;
+  const displayName = isNaN(aspect)
+    ? `[${displayIndex}]`
+    : `[${displayIndex}]${outputName}`;
 
   const handleSave = async () => {
-    if (process.image && process.cropCoordinates && outputName !== "[ - ]") {
+    if (process.image && process.cropCoordinates) {
+      // Check save conditions based on aspect ratio
+      const canSave = isNaN(aspect) || outputName !== "[ - ]";
+
+      if (!canSave) return;
+
       // Create the cropped image
       const croppedImageDataUrl = await createCroppedImage();
 
@@ -146,7 +160,9 @@ export default function ProcessPanel() {
       const blob = await response.blob();
 
       // Use the displayName format that includes the index
-      const finalOutputName = `[${displayIndex}]${outputName}`;
+      const finalOutputName = isNaN(aspect)
+        ? `[${displayIndex}]`
+        : `[${displayIndex}]${outputName}`;
 
       addOutput({
         id: Date.now().toString(),
@@ -176,17 +192,49 @@ export default function ProcessPanel() {
 
   const handleAspectChange = (newAspect: number) => {
     setAspect(newAspect);
-    setTimeout(() => {
-      const cropper = cropperRef.current?.cropper;
-      if (cropper) {
-        cropper.setAspectRatio(newAspect);
+    const cropper = cropperRef.current?.cropper;
 
-        cropper.zoomTo(1);
+    if (!cropper) return;
 
-        // Pastikan crop box tetap di tengah horizontal, tapi atas secara vertikal
-        cropper.setDragMode("move");
-      }
-    }, 1); // Delay agar cropper update aspect ratio & container
+    if (!isNaN(newAspect)) {
+      // Get current crop box data before changing aspect ratio
+      const currentCropBoxData = cropper.getCropBoxData();
+
+      // Set new aspect ratio
+      cropper.setAspectRatio(newAspect);
+
+      // Calculate center point of current crop box
+      const centerX = currentCropBoxData.left + currentCropBoxData.width / 2;
+      const centerY = currentCropBoxData.top + currentCropBoxData.height / 2;
+
+      // Get new crop box data after aspect ratio change
+      const newCropBoxData = cropper.getCropBoxData();
+
+      // Calculate offset to maintain center position
+      const offsetX =
+        centerX - (newCropBoxData.left + newCropBoxData.width / 2);
+      const offsetY =
+        centerY - (newCropBoxData.top + newCropBoxData.height / 2);
+
+      // Move crop box to maintain the same center position
+      cropper.setCropBoxData({
+        left: newCropBoxData.left + offsetX,
+        top: newCropBoxData.top + offsetY,
+        width: newCropBoxData.width,
+        height: newCropBoxData.height,
+      });
+
+      // Zoom to the crop area instead of center
+      const cropBoxCenter = {
+        x: newCropBoxData.left + offsetX + newCropBoxData.width / 2,
+        y: newCropBoxData.top + offsetY + newCropBoxData.height / 2,
+      };
+
+      cropper.zoomTo(1, cropBoxCenter);
+    } else {
+      // Reset to free aspect ratio
+      cropper.setAspectRatio(NaN);
+    }
   };
 
   useEffect(() => {
@@ -195,6 +243,12 @@ export default function ProcessPanel() {
       handleAspectChange(aspect);
     }
   }, [process.image, aspect]);
+
+  // Reset positions when aspect changes
+  useEffect(() => {
+    setFromPosition("");
+    setToPosition("");
+  }, [aspect]);
 
   // Handler saat crop selesai
   const handleCropEnd = useCallback(() => {
@@ -510,6 +564,14 @@ export default function ProcessPanel() {
             <div className="flex items-center gap-2">
               <Button
                 size="icon"
+                variant={isNaN(aspect) ? "default" : "secondary"}
+                onClick={() => handleAspectChange(NaN)}
+                className="rounded-full"
+              >
+                <Ratio className="w-5 h-5" />
+              </Button>
+              <Button
+                size="icon"
                 variant={aspect === 5 / 4 ? "default" : "secondary"}
                 onClick={() => handleAspectChange(5 / 4)}
                 className="rounded-full"
@@ -526,23 +588,29 @@ export default function ProcessPanel() {
               </Button>
             </div>
 
-            <span className="text-sm text-muted-foreground">{displayName}</span>
-
             <div className="flex items-center gap-2">
-              <Button
-                size="icon"
-                variant="secondary"
-                onClick={handlePreview}
-                disabled={!process.cropCoordinates}
-                className="rounded-full"
-              >
-                <Wand2 className="w-5 h-5" />
-              </Button>
+              <span className="text-sm text-muted-foreground">
+                {displayName}
+              </span>
+              {!isNaN(aspect) && (
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  onClick={handlePreview}
+                  disabled={!process.cropCoordinates}
+                  className="rounded-full"
+                >
+                  <Wand2 className="w-5 h-5" />
+                </Button>
+              )}
               <Button
                 size="icon"
                 variant="secondary"
                 onClick={handleSave}
-                disabled={!process.cropCoordinates || outputName === "[ - ]"}
+                disabled={
+                  !process.cropCoordinates ||
+                  (!isNaN(aspect) && outputName === "[ - ]")
+                }
                 className="rounded-full"
               >
                 <Save className="w-5 h-5" />

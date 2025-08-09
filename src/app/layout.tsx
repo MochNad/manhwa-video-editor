@@ -4,7 +4,6 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/provider/theme-provider";
 import { ControlPage } from "@/components/atoms/control-page";
 import { ModeToggle } from "@/components/atoms/mode-toggle";
-import { ControlAction } from "@/components/atoms/control-action";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,7 +30,6 @@ export default function RootLayout({
           {children}
           <ControlPage />
           <ModeToggle />
-          <ControlAction />
         </ThemeProvider>
       </body>
     </html>
