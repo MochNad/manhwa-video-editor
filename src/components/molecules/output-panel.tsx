@@ -68,7 +68,30 @@ export default function OutputPanel({}: object = {}) {
         <ScrollArea className="flex-1 w-full h-full min-h-0">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-4">
             {outputs
-              .sort((a, b) => a.outputName.localeCompare(b.outputName))
+              .sort((a, b) => {
+                // Custom sorting for pattern like [1], [2][T-B], [1][B-T]
+                const parseOutputName = (name: string) => {
+                  // Match pattern: [number][optional-animation]
+                  const match = name.match(/^\[(\d+)\](.*)$/);
+                  if (match) {
+                    const index = parseInt(match[1], 10);
+                    const animation = match[2] || ""; // empty string if no animation
+                    return { index, animation };
+                  }
+                  return { index: 0, animation: name };
+                };
+
+                const a_parsed = parseOutputName(a.outputName);
+                const b_parsed = parseOutputName(b.outputName);
+
+                // First sort by numeric index
+                if (a_parsed.index !== b_parsed.index) {
+                  return a_parsed.index - b_parsed.index;
+                }
+
+                // If same index, sort by animation suffix alphabetically
+                return a_parsed.animation.localeCompare(b_parsed.animation);
+              })
               .map((output) => (
                 <div
                   key={`${output.id}-${outputs.length}`}

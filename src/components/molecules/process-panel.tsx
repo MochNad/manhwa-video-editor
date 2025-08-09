@@ -42,8 +42,32 @@ export default function ProcessPanel() {
   const [toPosition, setToPosition] = useState("");
   const [croppedImageUrl, setCroppedImageUrl] = useState<string | null>(null);
   const [customIndex, setCustomIndex] = useState<number | "">("");
+  // Add state to track if coordinates have been saved and if they've changed
+  const [lastSavedCoordinates, setLastSavedCoordinates] = useState<
+    string | null
+  >(null);
+  const [coordinatesChanged, setCoordinatesChanged] = useState(false);
   const cropperRef = useRef<ReactCropperElement>(null);
   const containerRef = useRef<HTMLDivElement>(null); // Tambahkan ref untuk container
+
+  // Track coordinate changes
+  useEffect(() => {
+    if (process.cropCoordinates) {
+      const currentCoords = JSON.stringify(process.cropCoordinates);
+      if (lastSavedCoordinates !== currentCoords) {
+        setCoordinatesChanged(true);
+      }
+    }
+  }, [process.cropCoordinates, lastSavedCoordinates]);
+
+  // Reset tracking states when image changes
+  useEffect(() => {
+    setOutputName("[ - ]");
+    setCroppedImageUrl(null);
+    setLastSavedCoordinates(null);
+    setCoordinatesChanged(false);
+    handleAspectChange(aspect);
+  }, [process.image?.id, aspect]);
 
   // Reset crop when image changes & update cropper jika aspect berubah atau gambar baru
   useEffect(() => {
@@ -146,9 +170,11 @@ export default function ProcessPanel() {
   const handleSave = async () => {
     if (process.image && process.cropCoordinates) {
       // Check save conditions based on aspect ratio
-      const canSave = isNaN(aspect) || outputName !== "[ - ]";
+      const hasValidAnimationName =
+        isNaN(aspect) || (outputName !== "[ - ]" && outputName.includes("-"));
+      const hasCoordinateChanges = coordinatesChanged;
 
-      if (!canSave) return;
+      if (!hasValidAnimationName || !hasCoordinateChanges) return;
 
       // Create the cropped image
       const croppedImageDataUrl = await createCroppedImage();
@@ -172,6 +198,10 @@ export default function ProcessPanel() {
         croppedImageUrl: croppedImageDataUrl,
         croppedBlob: blob,
       });
+
+      // Update tracking states after successful save
+      setLastSavedCoordinates(JSON.stringify(process.cropCoordinates));
+      setCoordinatesChanged(false);
 
       setOutputName("[ - ]");
       setFromPosition("");
@@ -248,6 +278,9 @@ export default function ProcessPanel() {
   useEffect(() => {
     setFromPosition("");
     setToPosition("");
+    // Reset coordinate tracking when aspect changes
+    setLastSavedCoordinates(null);
+    setCoordinatesChanged(false);
   }, [aspect]);
 
   // Handler saat crop selesai
@@ -609,7 +642,9 @@ export default function ProcessPanel() {
                 onClick={handleSave}
                 disabled={
                   !process.cropCoordinates ||
-                  (!isNaN(aspect) && outputName === "[ - ]")
+                  !coordinatesChanged ||
+                  (!isNaN(aspect) &&
+                    (outputName === "[ - ]" || !outputName.includes("-")))
                 }
                 className="rounded-full"
               >
@@ -688,17 +723,13 @@ export default function ProcessPanel() {
                   <SelectValue placeholder="Ke" />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* Vertical movements */}
-                  {(fromPosition === "T" ||
-                    fromPosition === "C" ||
-                    fromPosition === "B") && (
+                  {/* Vertical movements (except Center) */}
+                  {(fromPosition === "T" || fromPosition === "B") && (
                     <>
                       {fromPosition !== "T" && (
                         <SelectItem value="T">Atas</SelectItem>
                       )}
-                      {fromPosition !== "C" && (
-                        <SelectItem value="C">Tengah</SelectItem>
-                      )}
+                      <SelectItem value="C">Tengah</SelectItem>
                       {fromPosition !== "B" && (
                         <SelectItem value="B">Bawah</SelectItem>
                       )}
@@ -716,7 +747,7 @@ export default function ProcessPanel() {
                       )}
                     </>
                   )}
-                  {/* Special case for C (center) - can go to any direction except same */}
+                  {/* Center can go to any direction */}
                   {fromPosition === "C" && (
                     <>
                       <SelectItem value="T">Atas</SelectItem>
@@ -799,22 +830,20 @@ export default function ProcessPanel() {
                   <SelectValue placeholder="Ke" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(fromPosition === "T" ||
-                    fromPosition === "C" ||
-                    fromPosition === "B") && (
+                  {/* Vertical movements (except Center) */}
+                  {(fromPosition === "T" || fromPosition === "B") && (
                     <>
                       {fromPosition !== "T" && (
                         <SelectItem value="T">Atas</SelectItem>
                       )}
-                      {fromPosition !== "C" && (
-                        <SelectItem value="C">Tengah</SelectItem>
-                      )}
+                      <SelectItem value="C">Tengah</SelectItem>
                       {fromPosition !== "B" && (
                         <SelectItem value="B">Bawah</SelectItem>
                       )}
                     </>
                   )}
 
+                  {/* Horizontal movements */}
                   {(fromPosition === "L" || fromPosition === "R") && (
                     <>
                       <SelectItem value="C">Tengah</SelectItem>
@@ -827,6 +856,7 @@ export default function ProcessPanel() {
                     </>
                   )}
 
+                  {/* Center can go to any direction */}
                   {fromPosition === "C" && (
                     <>
                       <SelectItem value="T">Atas</SelectItem>
