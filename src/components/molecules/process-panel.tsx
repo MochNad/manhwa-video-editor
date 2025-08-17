@@ -28,6 +28,7 @@ import {
   RectangleHorizontal,
   RectangleVertical,
   Ratio,
+  Merge,
 } from "lucide-react";
 import { useCrop } from "@/hooks/useCrop";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -42,6 +43,9 @@ export default function ProcessPanel() {
   const [toPosition, setToPosition] = useState("");
   const [croppedImageUrl, setCroppedImageUrl] = useState<string | null>(null);
   const [customIndex, setCustomIndex] = useState<number | "">("");
+  const [mergeMode, setMergeMode] = useState(false);
+  const [autoMergeNext, setAutoMergeNext] = useState(false);
+  const [mergePairCount, setMergePairCount] = useState(0);
   // Add state to track if coordinates have been saved and if they've changed
   const [lastSavedCoordinates, setLastSavedCoordinates] = useState<
     string | null
@@ -163,10 +167,50 @@ export default function ProcessPanel() {
 
   // Gunakan index dari customIndex atau auto
   const displayIndex = getNextIndex();
-  const displayName = isNaN(aspect)
+  let displayName = isNaN(aspect)
     ? `[${displayIndex}]`
     : `[${displayIndex}]${outputName}`;
+  if (isNaN(aspect) && mergeMode) {
+    displayName += "[MERGE]";
+  }
 
+  // Helper: count consecutive [MERGE] at the end
+  const getConsecutiveMergeAtEnd = useCallback(() => {
+    let count = 0;
+    for (let i = outputs.length - 1; i >= 0; i--) {
+      if (outputs[i].outputName?.includes("[MERGE]")) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    return count;
+  }, [outputs]);
+
+  // Detect if previous output is [MERGE] and auto-enable merge for next image (only for one pair)
+  useEffect(() => {
+    // If last output is [MERGE] and only one at the end, auto-enable merge for next image
+    const consecutiveMerge = getConsecutiveMergeAtEnd();
+    if (process.image?.id && outputs.length > 0) {
+      const lastOutput = outputs[outputs.length - 1];
+      const isPrevMerge = lastOutput.outputName?.includes("[MERGE]");
+      if (isPrevMerge && consecutiveMerge === 1) {
+        setMergeMode(true);
+        setAutoMergeNext(true);
+        setMergePairCount(1);
+      } else {
+        setMergeMode(false);
+        setAutoMergeNext(false);
+        setMergePairCount(0);
+      }
+    } else if (process.image?.id) {
+      setMergeMode(false);
+      setAutoMergeNext(false);
+      setMergePairCount(0);
+    }
+  }, [process.image?.id, outputs, getConsecutiveMergeAtEnd]);
+
+  // After saving, update mergePairCount to ensure only two images are auto-merged
   const handleSave = async () => {
     if (process.image && process.cropCoordinates) {
       // Check save conditions based on aspect ratio
@@ -186,9 +230,12 @@ export default function ProcessPanel() {
       const blob = await response.blob();
 
       // Use the displayName format that includes the index
-      const finalOutputName = isNaN(aspect)
+      let finalOutputName = isNaN(aspect)
         ? `[${displayIndex}]`
         : `[${displayIndex}]${outputName}`;
+      if (isNaN(aspect) && mergeMode) {
+        finalOutputName += "[MERGE]";
+      }
 
       addOutput({
         id: Date.now().toString(),
@@ -199,6 +246,22 @@ export default function ProcessPanel() {
         croppedBlob: blob,
       });
 
+      // If mergeMode is active, manage mergePairCount for auto merge
+      if (isNaN(aspect) && mergeMode) {
+        if (mergePairCount === 0) {
+          // First [MERGE] in pair, enable auto for next image
+          setMergePairCount(1);
+          setAutoMergeNext(true);
+        } else if (mergePairCount === 1) {
+          // Second [MERGE] in pair, reset for subsequent images
+          setMergePairCount(0);
+          setAutoMergeNext(false);
+        }
+      } else {
+        setMergePairCount(0);
+        setAutoMergeNext(false);
+      }
+
       // Update tracking states after successful save
       setLastSavedCoordinates(JSON.stringify(process.cropCoordinates));
       setCoordinatesChanged(false);
@@ -207,6 +270,7 @@ export default function ProcessPanel() {
       setFromPosition("");
       setToPosition("");
       setCustomIndex(""); // reset index ke auto
+      setMergeMode(false);
     }
   };
 
@@ -308,6 +372,13 @@ export default function ProcessPanel() {
         setCustomIndex(num);
       }
     }
+  };
+
+  // Merge button handler
+  const handleMergeToggle = () => {
+    // If autoMergeNext is true, do not allow disabling
+    if (autoMergeNext) return;
+    setMergeMode((prev) => !prev);
   };
 
   // ResizeObserver untuk membuat cropper responsif terhadap parent resize
@@ -634,6 +705,17 @@ export default function ProcessPanel() {
                   className="rounded-full"
                 >
                   <Wand2 className="w-5 h-5" />
+                </Button>
+              )}
+              {isNaN(aspect) && (
+                <Button
+                  size="icon"
+                  variant={mergeMode ? "default" : "secondary"}
+                  onClick={handleMergeToggle}
+                  disabled={autoMergeNext}
+                  className="rounded-full"
+                >
+                  <Merge className="w-5 h-5" />
                 </Button>
               )}
               <Button
