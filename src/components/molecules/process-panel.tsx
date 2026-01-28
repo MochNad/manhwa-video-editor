@@ -103,20 +103,14 @@ export default function ProcessPanel() {
 
   // Update output name when positions change
   useEffect(() => {
-    // Only update animation name if aspect ratio is set (not free ratio)
-    if (!isNaN(aspect)) {
-      if (fromPosition === "I" || fromPosition === "O") {
-        // For zoom animations, only use fromPosition
-        setOutputName(`[${fromPosition}]`);
-      } else if (fromPosition && toPosition) {
-        setOutputName(`[${fromPosition}-${toPosition}]`);
-      } else if (fromPosition) {
-        setOutputName(`[${fromPosition}-]`);
-      } else {
-        setOutputName("[ - ]");
-      }
+    if (fromPosition === "I" || fromPosition === "O") {
+      // For zoom animations, only use fromPosition
+      setOutputName(`[${fromPosition}]`);
+    } else if (fromPosition && toPosition) {
+      setOutputName(`[${fromPosition}-${toPosition}]`);
+    } else if (fromPosition) {
+      setOutputName(`[${fromPosition}-]`);
     } else {
-      // For free ratio, just use empty brackets
       setOutputName("[ - ]");
     }
   }, [fromPosition, toPosition, aspect]);
@@ -167,9 +161,7 @@ export default function ProcessPanel() {
 
   // Gunakan index dari customIndex atau auto
   const displayIndex = getNextIndex();
-  let displayName = isNaN(aspect)
-    ? `[${displayIndex}]`
-    : `[${displayIndex}]${outputName}`;
+  let displayName = `[${displayIndex}]${outputName}`;
   if (isNaN(aspect) && mergeMode) {
     displayName += "[MERGE]";
   }
@@ -213,9 +205,9 @@ export default function ProcessPanel() {
   // After saving, update mergePairCount to ensure only two images are auto-merged
   const handleSave = async () => {
     if (process.image && process.cropCoordinates) {
-      // Check save conditions based on aspect ratio
+      // Check save conditions
       const hasValidAnimationName =
-        isNaN(aspect) || (outputName !== "[ - ]" && outputName.includes("-"));
+        outputName !== "[ - ]" && outputName.includes("-");
       const hasCoordinateChanges = coordinatesChanged;
 
       if (!hasValidAnimationName || !hasCoordinateChanges) return;
@@ -230,9 +222,7 @@ export default function ProcessPanel() {
       const blob = await response.blob();
 
       // Use the displayName format that includes the index
-      let finalOutputName = isNaN(aspect)
-        ? `[${displayIndex}]`
-        : `[${displayIndex}]${outputName}`;
+      let finalOutputName = `[${displayIndex}]${outputName}`;
       if (isNaN(aspect) && mergeMode) {
         finalOutputName += "[MERGE]";
       }
@@ -696,28 +686,24 @@ export default function ProcessPanel() {
               <span className="text-sm text-muted-foreground">
                 {displayName}
               </span>
-              {!isNaN(aspect) && (
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  onClick={handlePreview}
-                  disabled={!process.cropCoordinates}
-                  className="rounded-full"
-                >
-                  <Wand2 className="w-5 h-5" />
-                </Button>
-              )}
-              {isNaN(aspect) && (
-                <Button
-                  size="icon"
-                  variant={mergeMode ? "default" : "secondary"}
-                  onClick={handleMergeToggle}
-                  disabled={autoMergeNext}
-                  className="rounded-full"
-                >
-                  <Merge className="w-5 h-5" />
-                </Button>
-              )}
+              <Button
+                size="icon"
+                variant="secondary"
+                onClick={handlePreview}
+                disabled={!process.cropCoordinates}
+                className="rounded-full"
+              >
+                <Wand2 className="w-5 h-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant={mergeMode ? "default" : "secondary"}
+                onClick={handleMergeToggle}
+                disabled={autoMergeNext || !isNaN(aspect)}
+                className="rounded-full"
+              >
+                <Merge className="w-5 h-5" />
+              </Button>
               <Button
                 size="icon"
                 variant="secondary"
@@ -725,8 +711,8 @@ export default function ProcessPanel() {
                 disabled={
                   !process.cropCoordinates ||
                   !coordinatesChanged ||
-                  (!isNaN(aspect) &&
-                    (outputName === "[ - ]" || !outputName.includes("-")))
+                  outputName === "[ - ]" ||
+                  !outputName.includes("-")
                 }
                 className="rounded-full"
               >
