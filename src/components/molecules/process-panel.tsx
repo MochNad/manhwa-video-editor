@@ -2,15 +2,18 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import Cropper, { ReactCropperElement } from "react-cropper";
 import "cropperjs/dist/cropper.css";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
   Drawer,
   DrawerContent,
+  DrawerDescription,
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
@@ -41,6 +44,8 @@ export default function ProcessPanel() {
   const [showPreview, setShowPreview] = useState(false);
   const [fromPosition, setFromPosition] = useState("");
   const [toPosition, setToPosition] = useState("");
+  const [selectedPreset, setSelectedPreset] = useState("");
+  const [usePreset, setUsePreset] = useState(false);
   const [croppedImageUrl, setCroppedImageUrl] = useState<string | null>(null);
   const [customIndex, setCustomIndex] = useState<number | "">("");
   const [mergeMode, setMergeMode] = useState(false);
@@ -51,6 +56,7 @@ export default function ProcessPanel() {
     string | null
   >(null);
   const [coordinatesChanged, setCoordinatesChanged] = useState(false);
+  const [cropperReady, setCropperReady] = useState(false);
   const cropperRef = useRef<ReactCropperElement>(null);
   const containerRef = useRef<HTMLDivElement>(null); // Tambahkan ref untuk container
 
@@ -70,15 +76,8 @@ export default function ProcessPanel() {
     setCroppedImageUrl(null);
     setLastSavedCoordinates(null);
     setCoordinatesChanged(false);
-    handleAspectChange(aspect);
-  }, [process.image?.id, aspect]);
-
-  // Reset crop when image changes & update cropper jika aspect berubah atau gambar baru
-  useEffect(() => {
-    setOutputName("[ - ]");
-    setCroppedImageUrl(null);
-    handleAspectChange(aspect);
-  }, [process.image?.id, aspect]);
+    setCropperReady(false);
+  }, [process.image?.id]);
 
   const createCroppedImage = useCallback(async () => {
     if (!process.image) return;
@@ -95,11 +94,7 @@ export default function ProcessPanel() {
     return dataUrl;
   }, [process.image]);
 
-  useEffect(() => {
-    if (process.cropCoordinates) {
-      createCroppedImage();
-    }
-  }, [createCroppedImage, process.cropCoordinates]);
+  // Removed redundant useEffect - createCroppedImage is now called explicitly
 
   // Update output name when positions change
   useEffect(() => {
@@ -123,11 +118,12 @@ export default function ProcessPanel() {
   }, [fromPosition, toPosition]);
 
   // Preview logic
-  const handlePreview = useCallback(() => {
+  const handlePreview = useCallback(async () => {
     if (process.cropCoordinates) {
+      await createCroppedImage();
       setShowPreview(true);
     }
-  }, [process.cropCoordinates]);
+  }, [process.cropCoordinates, createCroppedImage]);
 
   // Fungsi untuk menentukan index output berikutnya
   const getNextIndex = () => {
@@ -215,7 +211,10 @@ export default function ProcessPanel() {
       // Create the cropped image
       const croppedImageDataUrl = await createCroppedImage();
 
-      if (!croppedImageDataUrl) return;
+      if (!croppedImageDataUrl) {
+        console.error("Failed to create cropped image");
+        return;
+      }
 
       // Create a blob for download
       const response = await fetch(croppedImageDataUrl);
@@ -259,6 +258,8 @@ export default function ProcessPanel() {
       setOutputName("[ - ]");
       setFromPosition("");
       setToPosition("");
+      setSelectedPreset("");
+      setUsePreset(false);
       setCustomIndex(""); // reset index ke auto
       setMergeMode(false);
     }
@@ -268,13 +269,33 @@ export default function ProcessPanel() {
     setFromPosition(value);
     // Reset toPosition when fromPosition changes to avoid invalid combinations
     setToPosition("");
+    // Reset preset when manually changing position
+    setSelectedPreset("");
   };
 
   const handleToPositionChange = (value: string) => {
     setToPosition(value);
+    // Reset preset when manually changing position
+    setSelectedPreset("");
   };
 
-  const handleAspectChange = (newAspect: number) => {
+  const handlePresetChange = (value: string) => {
+    setSelectedPreset(value);
+    if (value) {
+      // Handle zoom presets (I and O)
+      if (value === "I" || value === "O") {
+        setFromPosition(value);
+        setToPosition("");
+      } else {
+        // Handle pan presets
+        const [from, to] = value.split("-");
+        setFromPosition(from);
+        setToPosition(to);
+      }
+    }
+  };
+
+  const handleAspectChange = useCallback((newAspect: number) => {
     setAspect(newAspect);
     const cropper = cropperRef.current?.cropper;
 
@@ -319,14 +340,15 @@ export default function ProcessPanel() {
       // Reset to free aspect ratio
       cropper.setAspectRatio(NaN);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    if (process.image) {
+    const cropper = cropperRef.current?.cropper;
+    if (process.image && cropper && cropperReady) {
       // Set initial aspect ratio and crop box when component mounts
       handleAspectChange(aspect);
     }
-  }, [process.image, aspect]);
+  }, [process.image, aspect, handleAspectChange, cropperReady]);
 
   // Reset positions when aspect changes
   useEffect(() => {
@@ -336,6 +358,16 @@ export default function ProcessPanel() {
     setLastSavedCoordinates(null);
     setCoordinatesChanged(false);
   }, [aspect]);
+
+  // Reset positions when switching between preset and manual mode
+  useEffect(() => {
+    if (!usePreset) {
+      setSelectedPreset("");
+    } else {
+      setFromPosition("");
+      setToPosition("");
+    }
+  }, [usePreset]);
 
   // Handler saat crop selesai
   const handleCropEnd = useCallback(() => {
@@ -379,14 +411,19 @@ export default function ProcessPanel() {
   };
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !cropperReady) return;
     const cropper = cropperRef.current?.cropper;
     if (!cropper) return;
 
     // Fungsi untuk trigger re-render pada cropper
     const handleResize = () => {
-      (cropper as CropperWithResize).resize();
-      (cropper as CropperWithResize).render(); // kadang perlu render ulang
+      try {
+        (cropper as CropperWithResize).resize();
+        (cropper as CropperWithResize).render(); // kadang perlu render ulang
+      } catch (error) {
+        // Ignore errors during resize
+        console.debug("Cropper resize error:", error);
+      }
     };
 
     // Buat observer
@@ -399,7 +436,7 @@ export default function ProcessPanel() {
     return () => {
       observer.disconnect();
     };
-  }, [process.image?.id]);
+  }, [process.image?.id, cropperReady]);
 
   // Gabungkan return
   return (
@@ -423,20 +460,62 @@ export default function ProcessPanel() {
         }
 
         /* Vertical animations */
+        .pan-B-BM {
+          animation: pan-B-BM 1.5s linear infinite normal;
+        }
         .pan-B-C {
           animation: pan-B-C 2s linear infinite normal;
+        }
+        .pan-B-TM {
+          animation: pan-B-TM 3s linear infinite normal;
         }
         .pan-B-T {
           animation: pan-B-T 4s linear infinite normal;
         }
-        .pan-C-T {
-          animation: pan-C-T 2s linear infinite normal;
+        .pan-BM-B {
+          animation: pan-BM-B 1.5s linear infinite normal;
+        }
+        .pan-BM-C {
+          animation: pan-BM-C 1.5s linear infinite normal;
+        }
+        .pan-BM-TM {
+          animation: pan-BM-TM 2s linear infinite normal;
+        }
+        .pan-BM-T {
+          animation: pan-BM-T 3s linear infinite normal;
         }
         .pan-C-B {
           animation: pan-C-B 2s linear infinite normal;
         }
+        .pan-C-BM {
+          animation: pan-C-BM 1.5s linear infinite normal;
+        }
+        .pan-C-TM {
+          animation: pan-C-TM 1.5s linear infinite normal;
+        }
+        .pan-C-T {
+          animation: pan-C-T 2s linear infinite normal;
+        }
+        .pan-TM-T {
+          animation: pan-TM-T 1.5s linear infinite normal;
+        }
+        .pan-TM-C {
+          animation: pan-TM-C 1.5s linear infinite normal;
+        }
+        .pan-TM-BM {
+          animation: pan-TM-BM 2s linear infinite normal;
+        }
+        .pan-TM-B {
+          animation: pan-TM-B 3s linear infinite normal;
+        }
+        .pan-T-TM {
+          animation: pan-T-TM 1.5s linear infinite normal;
+        }
         .pan-T-C {
           animation: pan-T-C 2s linear infinite normal;
+        }
+        .pan-T-BM {
+          animation: pan-T-BM 3s linear infinite normal;
         }
         .pan-T-B {
           animation: pan-T-B 4s linear infinite normal;
@@ -485,6 +564,16 @@ export default function ProcessPanel() {
         }
 
         /* Vertical keyframes */
+        @keyframes pan-B-BM {
+          0% {
+            background-position: center bottom;
+            background-size: cover;
+          }
+          100% {
+            background-position: center 75%;
+            background-size: cover;
+          }
+        }
         @keyframes pan-B-C {
           0% {
             background-position: center bottom;
@@ -492,6 +581,16 @@ export default function ProcessPanel() {
           }
           100% {
             background-position: center center;
+            background-size: cover;
+          }
+        }
+        @keyframes pan-B-TM {
+          0% {
+            background-position: center bottom;
+            background-size: cover;
+          }
+          100% {
+            background-position: center 25%;
             background-size: cover;
           }
         }
@@ -505,9 +604,39 @@ export default function ProcessPanel() {
             background-size: cover;
           }
         }
-        @keyframes pan-C-T {
+        @keyframes pan-BM-B {
           0% {
+            background-position: center 75%;
+            background-size: cover;
+          }
+          100% {
+            background-position: center bottom;
+            background-size: cover;
+          }
+        }
+        @keyframes pan-BM-C {
+          0% {
+            background-position: center 75%;
+            background-size: cover;
+          }
+          100% {
             background-position: center center;
+            background-size: cover;
+          }
+        }
+        @keyframes pan-BM-TM {
+          0% {
+            background-position: center 75%;
+            background-size: cover;
+          }
+          100% {
+            background-position: center 25%;
+            background-size: cover;
+          }
+        }
+        @keyframes pan-BM-T {
+          0% {
+            background-position: center 75%;
             background-size: cover;
           }
           100% {
@@ -525,6 +654,86 @@ export default function ProcessPanel() {
             background-size: cover;
           }
         }
+        @keyframes pan-C-BM {
+          0% {
+            background-position: center center;
+            background-size: cover;
+          }
+          100% {
+            background-position: center 75%;
+            background-size: cover;
+          }
+        }
+        @keyframes pan-C-TM {
+          0% {
+            background-position: center center;
+            background-size: cover;
+          }
+          100% {
+            background-position: center 25%;
+            background-size: cover;
+          }
+        }
+        @keyframes pan-C-T {
+          0% {
+            background-position: center center;
+            background-size: cover;
+          }
+          100% {
+            background-position: center top;
+            background-size: cover;
+          }
+        }
+        @keyframes pan-TM-T {
+          0% {
+            background-position: center 25%;
+            background-size: cover;
+          }
+          100% {
+            background-position: center top;
+            background-size: cover;
+          }
+        }
+        @keyframes pan-TM-C {
+          0% {
+            background-position: center 25%;
+            background-size: cover;
+          }
+          100% {
+            background-position: center center;
+            background-size: cover;
+          }
+        }
+        @keyframes pan-TM-BM {
+          0% {
+            background-position: center 25%;
+            background-size: cover;
+          }
+          100% {
+            background-position: center 75%;
+            background-size: cover;
+          }
+        }
+        @keyframes pan-TM-B {
+          0% {
+            background-position: center 25%;
+            background-size: cover;
+          }
+          100% {
+            background-position: center bottom;
+            background-size: cover;
+          }
+        }
+        @keyframes pan-T-TM {
+          0% {
+            background-position: center top;
+            background-size: cover;
+          }
+          100% {
+            background-position: center 25%;
+            background-size: cover;
+          }
+        }
         @keyframes pan-T-C {
           0% {
             background-position: center top;
@@ -532,6 +741,16 @@ export default function ProcessPanel() {
           }
           100% {
             background-position: center center;
+            background-size: cover;
+          }
+        }
+        @keyframes pan-T-BM {
+          0% {
+            background-position: center top;
+            background-size: cover;
+          }
+          100% {
+            background-position: center 75%;
             background-size: cover;
           }
         }
@@ -649,6 +868,7 @@ export default function ProcessPanel() {
               rotatable={false}
               highlight={false}
               toggleDragModeOnDblclick={false}
+              ready={() => setCropperReady(true)}
               cropend={handleCropEnd}
               zoomOnWheel={true}
             />
@@ -729,6 +949,9 @@ export default function ProcessPanel() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Pratinjau Animasi</DialogTitle>
+              <DialogDescription>
+                Lihat pratinjau animasi gambar yang sudah di-crop
+              </DialogDescription>
             </DialogHeader>
             <div className="flex justify-center p-4">
               {croppedImageUrl && (
@@ -752,80 +975,163 @@ export default function ProcessPanel() {
                 </div>
               )}
             </div>
-            <div className="flex w-full items-center justify-center gap-4 px-4 pb-4">
-              <input
-                type="number"
-                min={1}
-                max={999}
-                className="w-16 min-w-0 max-w-[80px] px-2 py-1 border rounded text-center text-sm bg-background"
-                value={customIndex}
-                onChange={handleIndexInputChange}
-                placeholder={getNextIndex().toString()}
-              />
-              <Select
-                value={fromPosition}
-                onValueChange={handleFromPositionChange}
-              >
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Dari" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="T">Atas</SelectItem>
-                  <SelectItem value="C">Tengah</SelectItem>
-                  <SelectItem value="B">Bawah</SelectItem>
-                  <SelectItem value="L">Kiri</SelectItem>
-                  <SelectItem value="R">Kanan</SelectItem>
-                  <SelectItem value="I">Dalam</SelectItem>
-                  <SelectItem value="O">Luar</SelectItem>
-                </SelectContent>
-              </Select>
-              <span className="text-sm text-muted-foreground">→</span>
-              <Select
-                value={toPosition}
-                onValueChange={handleToPositionChange}
-                disabled={
-                  !fromPosition || fromPosition === "I" || fromPosition === "O"
-                }
-              >
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Ke" />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Vertical movements (except Center) */}
-                  {(fromPosition === "T" || fromPosition === "B") && (
-                    <>
-                      {fromPosition !== "T" && (
-                        <SelectItem value="T">Atas</SelectItem>
-                      )}
-                      <SelectItem value="C">Tengah</SelectItem>
-                      {fromPosition !== "B" && (
-                        <SelectItem value="B">Bawah</SelectItem>
-                      )}
-                    </>
-                  )}
-                  {/* Horizontal movements */}
-                  {(fromPosition === "L" || fromPosition === "R") && (
-                    <>
-                      <SelectItem value="C">Tengah</SelectItem>
-                      {fromPosition === "L" && (
-                        <SelectItem value="R">Kanan</SelectItem>
-                      )}
-                      {fromPosition === "R" && (
-                        <SelectItem value="L">Kiri</SelectItem>
-                      )}
-                    </>
-                  )}
-                  {/* Center can go to any direction */}
-                  {fromPosition === "C" && (
-                    <>
+            <div className="flex flex-col w-full gap-4 px-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Index
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={999}
+                    className="w-20 px-3 py-2 border rounded-md text-center text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-all"
+                    value={customIndex}
+                    onChange={handleIndexInputChange}
+                    placeholder={getNextIndex().toString()}
+                  />
+                </div>
+                <div className="flex-1 flex items-center gap-2.5 pt-6">
+                  <Checkbox
+                    id="use-preset-dialog"
+                    checked={usePreset}
+                    onCheckedChange={(checked) =>
+                      setUsePreset(checked === true)
+                    }
+                  />
+                  <label
+                    htmlFor="use-preset-dialog"
+                    className="text-sm font-medium leading-none cursor-pointer select-none"
+                  >
+                    Gunakan Preset
+                  </label>
+                </div>
+              </div>
+              {usePreset ? (
+                <Select
+                  value={selectedPreset}
+                  onValueChange={handlePresetChange}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Pilih Preset Animasi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="T-B">Atas → Bawah</SelectItem>
+                    <SelectItem value="B-T">Bawah → Atas</SelectItem>
+                    <SelectItem value="T-C">Atas → Tengah</SelectItem>
+                    <SelectItem value="B-C">Bawah → Tengah</SelectItem>
+                    <SelectItem value="T-TM">Atas → Atas Tengah</SelectItem>
+                    <SelectItem value="T-BM">Atas → Bawah Tengah</SelectItem>
+                    <SelectItem value="B-TM">Bawah → Atas Tengah</SelectItem>
+                    <SelectItem value="B-BM">Bawah → Bawah Tengah</SelectItem>
+                    <SelectItem value="TM-T">Atas Tengah → Atas</SelectItem>
+                    <SelectItem value="TM-B">Atas Tengah → Bawah</SelectItem>
+                    <SelectItem value="BM-T">Bawah Tengah → Atas</SelectItem>
+                    <SelectItem value="BM-B">Bawah Tengah → Bawah</SelectItem>
+                    <SelectItem value="L-R">Kiri → Kanan</SelectItem>
+                    <SelectItem value="R-L">Kanan → Kiri</SelectItem>
+                    <SelectItem value="I">Zoom Dalam</SelectItem>
+                    <SelectItem value="O">Zoom Luar</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={fromPosition}
+                    onValueChange={handleFromPositionChange}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Dari" />
+                    </SelectTrigger>
+                    <SelectContent>
                       <SelectItem value="T">Atas</SelectItem>
+                      <SelectItem value="TM">Atas Tengah</SelectItem>
+                      <SelectItem value="C">Tengah</SelectItem>
+                      <SelectItem value="BM">Bawah Tengah</SelectItem>
                       <SelectItem value="B">Bawah</SelectItem>
                       <SelectItem value="L">Kiri</SelectItem>
                       <SelectItem value="R">Kanan</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+                      <SelectItem value="I">Dalam</SelectItem>
+                      <SelectItem value="O">Luar</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-muted-foreground">→</span>
+                  <Select
+                    value={toPosition}
+                    onValueChange={handleToPositionChange}
+                    disabled={
+                      !fromPosition ||
+                      fromPosition === "I" ||
+                      fromPosition === "O"
+                    }
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Ke" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {/* From T */}
+                      {fromPosition === "T" && (
+                        <>
+                          <SelectItem value="TM">Atas Tengah</SelectItem>
+                          <SelectItem value="C">Tengah</SelectItem>
+                          <SelectItem value="BM">Bawah Tengah</SelectItem>
+                          <SelectItem value="B">Bawah</SelectItem>
+                        </>
+                      )}
+                      {/* From TM */}
+                      {fromPosition === "TM" && (
+                        <>
+                          <SelectItem value="T">Atas</SelectItem>
+                          <SelectItem value="C">Tengah</SelectItem>
+                          <SelectItem value="BM">Bawah Tengah</SelectItem>
+                          <SelectItem value="B">Bawah</SelectItem>
+                        </>
+                      )}
+                      {/* From BM */}
+                      {fromPosition === "BM" && (
+                        <>
+                          <SelectItem value="B">Bawah</SelectItem>
+                          <SelectItem value="C">Tengah</SelectItem>
+                          <SelectItem value="TM">Atas Tengah</SelectItem>
+                          <SelectItem value="T">Atas</SelectItem>
+                        </>
+                      )}
+                      {/* From B */}
+                      {fromPosition === "B" && (
+                        <>
+                          <SelectItem value="BM">Bawah Tengah</SelectItem>
+                          <SelectItem value="C">Tengah</SelectItem>
+                          <SelectItem value="TM">Atas Tengah</SelectItem>
+                          <SelectItem value="T">Atas</SelectItem>
+                        </>
+                      )}
+                      {/* Horizontal movements */}
+                      {(fromPosition === "L" || fromPosition === "R") && (
+                        <>
+                          <SelectItem value="C">Tengah</SelectItem>
+                          {fromPosition === "L" && (
+                            <SelectItem value="R">Kanan</SelectItem>
+                          )}
+                          {fromPosition === "R" && (
+                            <SelectItem value="L">Kiri</SelectItem>
+                          )}
+                        </>
+                      )}
+                      {/* Center can go to any direction */}
+                      {fromPosition === "C" && (
+                        <>
+                          <SelectItem value="T">Atas</SelectItem>
+                          <SelectItem value="TM">Atas Tengah</SelectItem>
+                          <SelectItem value="BM">Bawah Tengah</SelectItem>
+                          <SelectItem value="B">Bawah</SelectItem>
+                          <SelectItem value="L">Kiri</SelectItem>
+                          <SelectItem value="R">Kanan</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>
@@ -834,6 +1140,9 @@ export default function ProcessPanel() {
           <DrawerContent>
             <DrawerHeader className="text-left">
               <DrawerTitle>Pratinjau Animasi</DrawerTitle>
+              <DrawerDescription>
+                Lihat pratinjau animasi gambar yang sudah di-crop
+              </DrawerDescription>
             </DrawerHeader>
             <div className="flex justify-center p-4 pb-4">
               {croppedImageUrl && (
@@ -857,84 +1166,166 @@ export default function ProcessPanel() {
                 </div>
               )}
             </div>
-            <div className="flex w-full items-center justify-center gap-4 px-4">
-              <input
-                type="number"
-                min={1}
-                max={999}
-                className="w-16 min-w-0 max-w-[80px] px-2 py-1 border rounded text-center text-sm bg-background"
-                value={customIndex}
-                onChange={handleIndexInputChange}
-                placeholder={getNextIndex().toString()}
-              />
-              <Select
-                value={fromPosition}
-                onValueChange={handleFromPositionChange}
-              >
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Dari" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="T">Atas</SelectItem>
-                  <SelectItem value="C">Tengah</SelectItem>
-                  <SelectItem value="B">Bawah</SelectItem>
-                  <SelectItem value="L">Kiri</SelectItem>
-                  <SelectItem value="R">Kanan</SelectItem>
-                  <SelectItem value="I">Dalam</SelectItem>
-                  <SelectItem value="O">Luar</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <span className="text-sm text-muted-foreground">→</span>
-
-              <Select
-                value={toPosition}
-                onValueChange={handleToPositionChange}
-                disabled={
-                  !fromPosition || fromPosition === "I" || fromPosition === "O"
-                }
-              >
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Ke" />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Vertical movements (except Center) */}
-                  {(fromPosition === "T" || fromPosition === "B") && (
-                    <>
-                      {fromPosition !== "T" && (
-                        <SelectItem value="T">Atas</SelectItem>
-                      )}
-                      <SelectItem value="C">Tengah</SelectItem>
-                      {fromPosition !== "B" && (
-                        <SelectItem value="B">Bawah</SelectItem>
-                      )}
-                    </>
-                  )}
-
-                  {/* Horizontal movements */}
-                  {(fromPosition === "L" || fromPosition === "R") && (
-                    <>
-                      <SelectItem value="C">Tengah</SelectItem>
-                      {fromPosition === "L" && (
-                        <SelectItem value="R">Kanan</SelectItem>
-                      )}
-                      {fromPosition === "R" && (
-                        <SelectItem value="L">Kiri</SelectItem>
-                      )}
-                    </>
-                  )}
-
-                  {/* Center can go to any direction */}
-                  {fromPosition === "C" && (
-                    <>
+            <div className="flex flex-col w-full gap-4 px-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Index
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={999}
+                    className="w-20 px-3 py-2 border rounded-md text-center text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-all"
+                    value={customIndex}
+                    onChange={handleIndexInputChange}
+                    placeholder={getNextIndex().toString()}
+                  />
+                </div>
+                <div className="flex-1 flex items-center gap-2.5 pt-6">
+                  <Checkbox
+                    id="use-preset-drawer"
+                    checked={usePreset}
+                    onCheckedChange={(checked) =>
+                      setUsePreset(checked === true)
+                    }
+                  />
+                  <label
+                    htmlFor="use-preset-drawer"
+                    className="text-sm font-medium leading-none cursor-pointer select-none"
+                  >
+                    Gunakan Preset
+                  </label>
+                </div>
+              </div>
+              {usePreset ? (
+                <Select
+                  value={selectedPreset}
+                  onValueChange={handlePresetChange}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Pilih Preset Animasi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="T-B">Atas → Bawah</SelectItem>
+                    <SelectItem value="B-T">Bawah → Atas</SelectItem>
+                    <SelectItem value="T-C">Atas → Tengah</SelectItem>
+                    <SelectItem value="B-C">Bawah → Tengah</SelectItem>
+                    <SelectItem value="T-TM">Atas → Atas Tengah</SelectItem>
+                    <SelectItem value="T-BM">Atas → Bawah Tengah</SelectItem>
+                    <SelectItem value="B-TM">Bawah → Atas Tengah</SelectItem>
+                    <SelectItem value="B-BM">Bawah → Bawah Tengah</SelectItem>
+                    <SelectItem value="TM-T">Atas Tengah → Atas</SelectItem>
+                    <SelectItem value="TM-B">Atas Tengah → Bawah</SelectItem>
+                    <SelectItem value="BM-T">Bawah Tengah → Atas</SelectItem>
+                    <SelectItem value="BM-B">Bawah Tengah → Bawah</SelectItem>
+                    <SelectItem value="L-R">Kiri → Kanan</SelectItem>
+                    <SelectItem value="R-L">Kanan → Kiri</SelectItem>
+                    <SelectItem value="I">Zoom Dalam</SelectItem>
+                    <SelectItem value="O">Zoom Luar</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={fromPosition}
+                    onValueChange={handleFromPositionChange}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Dari" />
+                    </SelectTrigger>
+                    <SelectContent>
                       <SelectItem value="T">Atas</SelectItem>
+                      <SelectItem value="TM">Atas Tengah</SelectItem>
+                      <SelectItem value="C">Tengah</SelectItem>
+                      <SelectItem value="BM">Bawah Tengah</SelectItem>
                       <SelectItem value="B">Bawah</SelectItem>
                       <SelectItem value="L">Kiri</SelectItem>
                       <SelectItem value="R">Kanan</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+                      <SelectItem value="I">Dalam</SelectItem>
+                      <SelectItem value="O">Luar</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <span className="text-sm text-muted-foreground">→</span>
+
+                  <Select
+                    value={toPosition}
+                    onValueChange={handleToPositionChange}
+                    disabled={
+                      !fromPosition ||
+                      fromPosition === "I" ||
+                      fromPosition === "O"
+                    }
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Ke" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {/* From T */}
+                      {fromPosition === "T" && (
+                        <>
+                          <SelectItem value="TM">Atas Tengah</SelectItem>
+                          <SelectItem value="C">Tengah</SelectItem>
+                          <SelectItem value="BM">Bawah Tengah</SelectItem>
+                          <SelectItem value="B">Bawah</SelectItem>
+                        </>
+                      )}
+                      {/* From TM */}
+                      {fromPosition === "TM" && (
+                        <>
+                          <SelectItem value="T">Atas</SelectItem>
+                          <SelectItem value="C">Tengah</SelectItem>
+                          <SelectItem value="BM">Bawah Tengah</SelectItem>
+                          <SelectItem value="B">Bawah</SelectItem>
+                        </>
+                      )}
+                      {/* From BM */}
+                      {fromPosition === "BM" && (
+                        <>
+                          <SelectItem value="B">Bawah</SelectItem>
+                          <SelectItem value="C">Tengah</SelectItem>
+                          <SelectItem value="TM">Atas Tengah</SelectItem>
+                          <SelectItem value="T">Atas</SelectItem>
+                        </>
+                      )}
+                      {/* From B */}
+                      {fromPosition === "B" && (
+                        <>
+                          <SelectItem value="BM">Bawah Tengah</SelectItem>
+                          <SelectItem value="C">Tengah</SelectItem>
+                          <SelectItem value="TM">Atas Tengah</SelectItem>
+                          <SelectItem value="T">Atas</SelectItem>
+                        </>
+                      )}
+
+                      {/* Horizontal movements */}
+                      {(fromPosition === "L" || fromPosition === "R") && (
+                        <>
+                          <SelectItem value="C">Tengah</SelectItem>
+                          {fromPosition === "L" && (
+                            <SelectItem value="R">Kanan</SelectItem>
+                          )}
+                          {fromPosition === "R" && (
+                            <SelectItem value="L">Kiri</SelectItem>
+                          )}
+                        </>
+                      )}
+
+                      {fromPosition === "C" && (
+                        <>
+                          <SelectItem value="T">Atas</SelectItem>
+                          <SelectItem value="TM">Atas Tengah</SelectItem>
+                          <SelectItem value="BM">Bawah Tengah</SelectItem>
+                          <SelectItem value="B">Bawah</SelectItem>
+                          <SelectItem value="L">Kiri</SelectItem>
+                          <SelectItem value="R">Kanan</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           </DrawerContent>
         </Drawer>
