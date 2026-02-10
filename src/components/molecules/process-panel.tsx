@@ -259,7 +259,7 @@ export default function ProcessPanel() {
       setFromPosition("");
       setToPosition("");
       setSelectedPreset("");
-      setUsePreset(false);
+      setUsePreset(true);
       setCustomIndex(""); // reset index ke auto
       setMergeMode(false);
     }
