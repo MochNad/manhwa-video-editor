@@ -45,7 +45,7 @@ export default function ProcessPanel() {
   const [fromPosition, setFromPosition] = useState("");
   const [toPosition, setToPosition] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("");
-  const [usePreset, setUsePreset] = useState(false);
+  const [usePreset, setUsePreset] = useState(true);
   const [croppedImageUrl, setCroppedImageUrl] = useState<string | null>(null);
   const [customIndex, setCustomIndex] = useState<number | "">("");
   const [mergeMode, setMergeMode] = useState(false);
@@ -1020,18 +1020,8 @@ export default function ProcessPanel() {
                     <SelectItem value="B-T">Bawah → Atas</SelectItem>
                     <SelectItem value="T-C">Atas → Tengah</SelectItem>
                     <SelectItem value="B-C">Bawah → Tengah</SelectItem>
-                    <SelectItem value="T-TM">Atas → Atas Tengah</SelectItem>
                     <SelectItem value="T-BM">Atas → Bawah Tengah</SelectItem>
                     <SelectItem value="B-TM">Bawah → Atas Tengah</SelectItem>
-                    <SelectItem value="B-BM">Bawah → Bawah Tengah</SelectItem>
-                    <SelectItem value="TM-T">Atas Tengah → Atas</SelectItem>
-                    <SelectItem value="TM-B">Atas Tengah → Bawah</SelectItem>
-                    <SelectItem value="BM-T">Bawah Tengah → Atas</SelectItem>
-                    <SelectItem value="BM-B">Bawah Tengah → Bawah</SelectItem>
-                    <SelectItem value="L-R">Kiri → Kanan</SelectItem>
-                    <SelectItem value="R-L">Kanan → Kiri</SelectItem>
-                    <SelectItem value="I">Zoom Dalam</SelectItem>
-                    <SelectItem value="O">Zoom Luar</SelectItem>
                   </SelectContent>
                 </Select>
               ) : (
@@ -1211,18 +1201,8 @@ export default function ProcessPanel() {
                     <SelectItem value="B-T">Bawah → Atas</SelectItem>
                     <SelectItem value="T-C">Atas → Tengah</SelectItem>
                     <SelectItem value="B-C">Bawah → Tengah</SelectItem>
-                    <SelectItem value="T-TM">Atas → Atas Tengah</SelectItem>
                     <SelectItem value="T-BM">Atas → Bawah Tengah</SelectItem>
                     <SelectItem value="B-TM">Bawah → Atas Tengah</SelectItem>
-                    <SelectItem value="B-BM">Bawah → Bawah Tengah</SelectItem>
-                    <SelectItem value="TM-T">Atas Tengah → Atas</SelectItem>
-                    <SelectItem value="TM-B">Atas Tengah → Bawah</SelectItem>
-                    <SelectItem value="BM-T">Bawah Tengah → Atas</SelectItem>
-                    <SelectItem value="BM-B">Bawah Tengah → Bawah</SelectItem>
-                    <SelectItem value="L-R">Kiri → Kanan</SelectItem>
-                    <SelectItem value="R-L">Kanan → Kiri</SelectItem>
-                    <SelectItem value="I">Zoom Dalam</SelectItem>
-                    <SelectItem value="O">Zoom Luar</SelectItem>
                   </SelectContent>
                 </Select>
               ) : (
